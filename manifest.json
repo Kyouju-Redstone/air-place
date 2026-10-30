@@ -1,0 +1,25 @@
+{
+    "format_version": 2,
+    "header": {
+        "name": "Air Place",
+        "description": "Place blocks in midair with ease! Created by Kyouju",
+        "uuid": "946f3787-441e-4834-9b32-7a965638726a",
+        "version": [1, 0, 0],
+        "min_engine_version": [1, 21, 100]
+    },
+    "modules": [
+        {
+            "type": "script",
+            "language": "javascript",
+            "uuid": "ff25da18-0e8a-4c37-9d88-f08e073b2a03",
+            "version": [1, 0, 0],
+            "entry": "scripts/main.js"
+        }
+    ],
+    "dependencies": [
+        {
+            "module_name": "@minecraft/server",
+            "version": "2.0.0"
+        }
+    ]
+}
