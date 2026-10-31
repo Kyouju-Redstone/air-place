@@ -10,7 +10,7 @@ export const config = {
     enabledPlacementDefault: true,
 
     // デバッグ出力のON/OFF(開発者がここで切り替える)
-    debug: true,
+    debug: false,
 
     // /scriptevent のネームスペース(/scriptevent air_place:xxx)
     commandNamespace: "airplace",
