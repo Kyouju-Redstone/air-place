@@ -1,11 +1,24 @@
-{
-    "placeDistance": 4,
-    "normalReach": 7,
-    "enabledDefault": true,
-    "debug": true,
-    "commandNamespace": "airplace",
-    "supportRequired": {
-        "ids": [
+// 調整できる設定。値を書き換えるだけで挙動を変えられる
+export const config = {
+    // 空中に置く距離(ブロック数)
+    placeDistance: 4,
+
+    // 通常の設置が効く範囲。この範囲内にブロックが見えている時は通常設置に任せる
+    normalReach: 7,
+
+    // 空中設置の初期状態(コマンドで変えた設定が保存されていれば、そちらが優先される)
+    enabledPlacementDefault: true,
+
+    // デバッグ出力のON/OFF(開発者がここで切り替える)
+    debug: true,
+
+    // /scriptevent のネームスペース(/scriptevent air_place:xxx)
+    commandNamespace: "airplace",
+
+    // 支えが必要で、空中に置けないブロック("minecraft:" を除いたID)
+    supportRequired: {
+        // 完全一致
+        ids: [
             "lever",
             "torch",
             "soul_torch",
@@ -77,9 +90,10 @@
             "pink_petals",
             "firefly_bush",
             "bush",
-            "cactus_flower"
+            "cactus_flower",
         ],
-        "suffixes": [
+        // 末尾一致
+        suffixes: [
             "_button",
             "_pressure_plate",
             "_sign",
@@ -94,11 +108,14 @@
             "_coral",
             "_torch",
             "_lantern",
-            "_propagule"
-        ]
+            "_propagule",
+        ],
     },
-    "facing": {
-        "towardPlayerIds": [
+
+    // ブロックの向きの設定
+    facing: {
+        // 前面がプレイヤー側を向くブロック(facing_direction を使うもの)
+        towardPlayerIds: [
             "piston",
             "sticky_piston",
             "observer",
@@ -107,15 +124,17 @@
             "barrel",
             "command_block",
             "repeating_command_block",
-            "chain_command_block"
+            "chain_command_block",
         ],
-        "flipHorizontalIds": [
+        // 水平方向(東西南北)で、前面の向きを反転させるブロック
+        flipHorizontalIds: [
             "piston",
             "sticky_piston",
-            "observer"
+            "observer",
         ],
-        "flipVerticalIds": [
-            "observer"
-        ]
-    }
-}
+        // 垂直方向(上下)で、前面の向きを反転させるブロック
+        flipVerticalIds: [
+            "observer",
+        ],
+    },
+};
