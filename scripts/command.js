@@ -70,7 +70,7 @@ function showPlacementStateMessage(event) {
 
 // コマンド不明時出力関数
 function showCommandNotFoundMessage(event) {
-    reply(event.sourceEntity, `Command not found: ${config.commandNamespace}:enable ${event.message.trim()} (usage: enable [on|off])`);
+    reply(event.sourceEntity, `Command not found.`);
 }
 
 // /scripteventコマンドを受け取った時の処理
