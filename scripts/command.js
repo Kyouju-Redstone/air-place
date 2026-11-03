@@ -12,7 +12,7 @@ function parseSwitch(message, current) {
         return true;
     }
     else if (arg === "off") {
-        // 引数が「OFF」の場合はtrueを返す
+        // 引数が「OFF」の場合はfalseを返す
         return false;
     }
     else if (arg === "") {
@@ -37,10 +37,10 @@ function stateText(value) {
 }
 
 // コマンドを実行したプレイヤーにメッセージを返す(コンテンツログにも出力)
-function reply(player, text) {
+function reply(entity, text) {
     console.log(text);
-    if (player) {
-        player.sendMessage(text);
+    if (entity && entity.typeId === "minecraft:player") {
+        entity.sendMessage(text);
     }
 }
 

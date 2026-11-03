@@ -6,13 +6,22 @@ export const config = {
     // 通常の設置が効く範囲。この範囲内にブロックが見えている時は通常設置に任せる
     normalReach: 7,
 
+    // [タッチ操作のみ] 空中設置したブロックを壊せなくする時間(tick)
+    // 長押しで設置した直後に、そのブロックが壊れてしまうのを防ぐ
+    breakProtectTicks: 20,
+
+    // [タッチ操作のみ] 長押しが終わったとみなす間隔(tick)。20tick = 1秒
+    // 前回の操作(アイテム使用・ブロックを叩く・ブロックを壊す)からこの間隔以内は、
+    // 長押しが続いていると判断して空中設置しない
+    holdReleaseTicks: 10,
+
     // 空中設置の初期状態(コマンドで変えた設定が保存されていれば、そちらが優先される)
     enabledPlacementDefault: true,
 
     // デバッグ出力のON/OFF(開発者がここで切り替える)
     debug: false,
 
-    // /scriptevent のネームスペース(/scriptevent air_place:xxx)
+    // /scriptevent のネームスペース(/scriptevent airplace:xxx)
     commandNamespace: "airplace",
 
     // 支えが必要で、空中に置けないブロック("minecraft:" を除いたID)

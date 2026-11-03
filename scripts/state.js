@@ -5,7 +5,7 @@ import { config } from "./config.js";
 // 有効/無効をワールドに保存する際のキー
 const PROPERTY_ENABLED = `${config.commandNamespace}:enabled`;
 
-// 空中設置の有効無効値(初期値: config.jsのenabledDefault)
+// 空中設置の有効無効値(初期値: config.jsのenabledPlacementDefault)
 let placementState = config.enabledPlacementDefault;
 
 // 空中設置の有効無効値返却関数

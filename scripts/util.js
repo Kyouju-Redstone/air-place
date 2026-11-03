@@ -4,24 +4,26 @@ import { config } from "./config.js";
 export const NAMESPACE_PREFIX = "minecraft:";
 
 // デバッグ出力関数
+// message は文字列、または文字列を返す関数
+// 重い整形(JSON.stringify など)は関数で渡すと、デバッグ無効時に実行されない
 export function debug(player, message) {
-    // デバッグ無効時は終了させる　
+    // デバッグ無効時は終了させる
     if (!config.debug) {
         return;
     }
 
+    // メッセージを作成する
+    let body = message;
+    if (typeof message === "function") {
+        body = message();
+    }
+
     // メッセージを送信する
-    const text = `[AirPlace] ${message}`;
+    const text = `[AirPlace] ${body}`;
     console.log(text);
     if (player) {
         player.sendMessage(text);
     }
-}
-
-// 座標出力関数
-export function formatVector(v) {
-    // (x, y, z)形式の文字列にする(小数第2位まで)
-    return `(${v.x.toFixed(2)}, ${v.y.toFixed(2)}, ${v.z.toFixed(2)})`;
 }
 
 // ID抽出関数
@@ -86,4 +88,20 @@ export function getNearestHorizontalDirection(dir) {
         return "south";
     }
     return "north";
+}
+
+// 必要な設定値が数値で入っているか確認する(足りない場合はコンテンツログに警告を出す)
+export function checkConfig() {
+    const requiredNumbers = [
+        "normalReach",
+        "placeDistance",
+        "holdReleaseTicks",
+        "breakProtectTicks",
+    ];
+
+    for (const key of requiredNumbers) {
+        if (typeof config[key] !== "number") {
+            console.warn(`[AirPlace] config.js の ${key} が数値で設定されていません`);
+        }
+    }
 }

@@ -1,5 +1,11 @@
 // ブロック設置処理: アイテムを使った時に、視線の先の空中へブロックを置く
-import { BlockPermutation, BlockTypes, GameMode } from "@minecraft/server";
+import {
+    system,
+    BlockPermutation,
+    BlockTypes,
+    GameMode,
+    InputMode,
+} from "@minecraft/server";
 import { config } from "./config.js";
 import {
     NAMESPACE_PREFIX,
@@ -10,6 +16,8 @@ import {
     getNearestHorizontalDirection,
 } from "./util.js";
 import { isEnabledPlacement } from "./state.js";
+
+// ===== 定数 =====
 
 // 方向の反対
 const OPPOSITE = {
@@ -39,10 +47,32 @@ const WEIRDO_VALUE = {
     north: 3,
 };
 
-// config.json の配列を、判定しやすいように Set にしておく
+// config.js の配列を、判定しやすいように Set にしておく
+const supportRequiredIds = new Set(config.supportRequired.ids);
 const towardPlayerIds = new Set(config.facing.towardPlayerIds);
 const flipHorizontalIds = new Set(config.facing.flipHorizontalIds);
 const flipVerticalIds = new Set(config.facing.flipVerticalIds);
+
+// ===== 状態 =====
+
+// プレイヤーごとの、最後に操作(アイテム使用・ブロックを叩く・ブロックを壊す)したtick
+// スマホで、長押しが継続中かどうかの判定に使う
+const lastActivityTicks = new Map();
+
+// 空中設置したブロックの座標 → 破壊保護が切れるtick
+const protectedBlocks = new Map();
+
+// ===== 共通の判定 =====
+
+// タッチ操作中かどうか
+function isTouchInput(player) {
+    return player.inputInfo.lastInputModeUsed === InputMode.Touch;
+}
+
+// 座標をMapのキーにするための文字列にする
+function makeBlockKey(dimensionId, location) {
+    return `${dimensionId}:${location.x},${location.y},${location.z}`;
+}
 
 // 支えが必要なブロックかを判別する関数
 function needsSupport(typeId) {
@@ -52,13 +82,12 @@ function needsSupport(typeId) {
     }
 
     // IDがsupportRequired.idsのいずれかと完全一致する場合は支え必要の判定とする
-    const supportRequiredIds = new Set(config.supportRequired.ids);
     const id = stripNamespace(typeId);
     if (supportRequiredIds.has(id)) {
         return true;
     }
 
-    // IDの末尾がIDがsupportRequired.suffixesのいずれかと一致する場合は支え必要の判定とする
+    // IDの末尾がsupportRequired.suffixesのいずれかと一致する場合は支え必要の判定とする
     for (const suffix of config.supportRequired.suffixes) {
         if (id.endsWith(suffix)) {
             return true;
@@ -90,6 +119,8 @@ function isPlaceableBlock(player, item) {
 
     return true;
 }
+
+// ===== 向きの反映 =====
 
 // ステート名を探す("minecraft:" 付きと無しの両方を試す)
 function findStateKey(permutation, baseName) {
@@ -177,7 +208,7 @@ function createPermutation(player, typeId, dir) {
     let permutation = BlockPermutation.resolve(typeId);
     const id = stripNamespace(typeId);
 
-    debug(player, `初期ステート: ${JSON.stringify(permutation.getAllStates())}`);
+    debug(player, () => `初期ステート: ${JSON.stringify(permutation.getAllStates())}`);
 
     try {
         permutation = applyFacingDirection(player, permutation, id, dir);
@@ -187,9 +218,11 @@ function createPermutation(player, typeId, dir) {
         debug(player, `向き反映に失敗: ${e}`);
     }
 
-    debug(player, `最終ステート: ${JSON.stringify(permutation.getAllStates())}`);
+    debug(player, () => `最終ステート: ${JSON.stringify(permutation.getAllStates())}`);
     return permutation;
 }
+
+// ===== 設置先の決定 =====
 
 // 設置予定座標の情報を取得する関数
 function findPlaceTarget(player) {
@@ -231,19 +264,56 @@ function findPlaceTarget(player) {
     return { block, target, dir };
 }
 
-// アイテム使用イベント発火時処理
-export function onItemUse(event) {
-    const player = event.source;
-    const item = event.itemStack;
+// ===== スマホの長押し対策 =====
 
-    // 無効時は何もしない
-    if (!isEnabledPlacement()) {
-        debug(player, "中断: 空中設置無効状態");
+// 操作があったことを記録する
+function recordActivity(player) {
+    lastActivityTicks.set(player.id, system.currentTick);
+}
+
+// 長押しが継続中かどうかを返す(タッチ操作のみ)
+// 判定のたびに「最後に操作したtick」を更新するので、押し続けている間は継続中のままになる
+function isHoldContinuing(player) {
+    const now = system.currentTick;
+    const lastTick = lastActivityTicks.get(player.id);
+    lastActivityTicks.set(player.id, now);
+
+    if (lastTick === undefined) {
+        return false;
+    }
+
+    const gap = now - lastTick;
+    debug(player, `前回の操作から ${gap}tick`);
+    return gap <= config.holdReleaseTicks;
+}
+
+// 保護期限が切れたブロックを記録から消す
+function cleanupProtectedBlocks() {
+    const now = system.currentTick;
+    for (const [key, expireTick] of protectedBlocks) {
+        if (expireTick <= now) {
+            protectedBlocks.delete(key);
+        }
+    }
+}
+
+// 空中設置したブロックを、一定時間だけ壊せなくする(タッチ操作のみ)
+function protectPlacedBlock(player, target) {
+    if (!isTouchInput(player)) {
         return;
     }
 
+    cleanupProtectedBlocks();
+    const key = makeBlockKey(player.dimension.id, target);
+    protectedBlocks.set(key, system.currentTick + config.breakProtectTicks);
+}
+
+// ===== 空中設置 =====
+
+// 空中設置を試みる
+function tryAirPlace(player, item) {
     debug(player, "----------------------------------------");
-    debug(player, `onItemUse発火: item=${item.typeId}`);
+    debug(player, `空中設置を試行: item=${item.typeId}`);
 
     // ブロックの設置が可能かを判別
     if (!isPlaceableBlock(player, item)) {
@@ -260,7 +330,79 @@ export function onItemUse(event) {
     const permutation = createPermutation(player, item.typeId, place.dir);
     place.block.setPermutation(permutation);
 
+    // 設置したブロックを、一定時間だけ壊せなくする
+    protectPlacedBlock(player, place.target);
+
     const { target } = place;
-    debug(player, `設置後の実ステート: ${JSON.stringify(place.block.permutation.getAllStates())}`);
+    debug(player, () => `設置後の実ステート: ${JSON.stringify(place.block.permutation.getAllStates())}`);
     debug(player, `設置成功: ${item.typeId} -> (${target.x}, ${target.y}, ${target.z})`);
+}
+
+// ===== イベント処理 =====
+
+// アイテム使用イベント発火時処理
+// PCは右クリック、スマホは長押しで発火する
+export function onItemUse(event) {
+    const player = event.source;
+    debug(player, () => `itemUse発火: tick=${system.currentTick}`);
+
+    // 無効時は何もしない
+    if (!isEnabledPlacement()) {
+        debug(player, "中断: 空中設置無効状態");
+        return;
+    }
+
+    // スマホでは、長押しが続いている間は設置しない
+    // (指で触れた位置がわからないため、ブロックを壊した後も続く長押しで、設置が走るのを防ぐ)
+    if (isTouchInput(player) && isHoldContinuing(player)) {
+        debug(player, "中断: 長押し継続中のため設置しない");
+        return;
+    }
+
+    tryAirPlace(player, event.itemStack);
+}
+
+// ブロックを叩いた時のイベント発火時処理(スマホのみ)
+// ブロックに対する長押しとみなして、操作があったことを記録する
+export function onEntityHitBlock(event) {
+    const player = event.damagingEntity;
+    if (player.typeId !== "minecraft:player") {
+        return;
+    }
+    if (!isTouchInput(player)) {
+        return;
+    }
+
+    recordActivity(player);
+    debug(player, () => `ブロックを叩いた: tick=${system.currentTick}`);
+}
+
+// ブロック破壊イベント発火時処理
+// 空中設置した直後のブロックは、保護期間中は壊せないようにする
+export function onPlayerBreakBlock(event) {
+    // スマホでは、ブロックを壊した操作も、操作があったこととして記録する
+    const player = event.player;
+    if (isTouchInput(player)) {
+        recordActivity(player);
+    }
+
+    const key = makeBlockKey(event.block.dimension.id, event.block.location);
+    const expireTick = protectedBlocks.get(key);
+    if (expireTick === undefined) {
+        return;
+    }
+
+    // 保護期間が過ぎていれば、通常通り壊せる
+    if (expireTick <= system.currentTick) {
+        protectedBlocks.delete(key);
+        return;
+    }
+
+    // 保護期間中は破壊をキャンセルする
+    event.cancel = true;
+
+    // beforeイベント内ではチャット送信などができないため、デバッグ出力は次のtickに回す
+    system.run(() => {
+        debug(player, "破壊をキャンセル: 空中設置直後のブロックは保護中");
+    });
 }
