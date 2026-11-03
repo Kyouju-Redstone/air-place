@@ -1,4 +1,4 @@
-# Air Block Placement / 空中ブロック設置
+# Air Place
 
 [English](#english) | [日本語](#日本語)
 
