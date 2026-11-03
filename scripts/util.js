@@ -101,7 +101,7 @@ export function checkConfig() {
 
     for (const key of requiredNumbers) {
         if (typeof config[key] !== "number") {
-            console.warn(`[AirPlace] config.js の ${key} が数値で設定されていません`);
+            console.warn(`[AirPlace] config.js: ${key} is not set to a number`);
         }
     }
 }

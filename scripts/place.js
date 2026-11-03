@@ -101,19 +101,19 @@ function needsSupport(typeId) {
 function isPlaceableBlock(player, item) {
     // クリエイティブモード以外の場合は設置不可
     if (player.getGameMode() !== GameMode.Creative) {
-        debug(player, "中断: 現在クリエイティブモードではありません");
+        debug(player, "Aborted: not in Creative mode");
         return false;
     }
 
     // ブロック以外のアイテムは対象外
     if (!BlockTypes.get(item.typeId)) {
-        debug(player, `中断: ${item.typeId} はブロックではありません`);
+        debug(player, `Aborted: ${item.typeId} is not a block`);
         return false;
     }
 
     // 支えが必要なブロックは対象外
     if (needsSupport(item.typeId)) {
-        debug(player, `中断: ${item.typeId} は支えが必要なブロックです`);
+        debug(player, `Aborted: ${item.typeId} needs support to be placed`);
         return false;
     }
 
@@ -175,7 +175,7 @@ function applyFacingDirection(player, permutation, id, dir) {
         }
     }
 
-    debug(player, `向き反映: look=${look} -> facing=${facing}`);
+    debug(player, `Facing applied: look=${look} -> facing=${facing}`);
     return setFacing(permutation, facing);
 }
 
@@ -187,7 +187,7 @@ function applyCardinalDirection(player, permutation, dir) {
     }
 
     const facing = OPPOSITE[getNearestHorizontalDirection(dir)];
-    debug(player, `向き反映: ${key}=${facing}`);
+    debug(player, `Facing applied: ${key}=${facing}`);
     return permutation.withState(key, facing);
 }
 
@@ -199,7 +199,7 @@ function applyWeirdoDirection(player, permutation, dir) {
     }
 
     const look = getNearestHorizontalDirection(dir);
-    debug(player, `向き反映: ${key}=${look}`);
+    debug(player, `Facing applied: ${key}=${look}`);
     return permutation.withState(key, WEIRDO_VALUE[look]);
 }
 
@@ -208,17 +208,17 @@ function createPermutation(player, typeId, dir) {
     let permutation = BlockPermutation.resolve(typeId);
     const id = stripNamespace(typeId);
 
-    debug(player, () => `初期ステート: ${JSON.stringify(permutation.getAllStates())}`);
+    debug(player, () => `Initial states: ${JSON.stringify(permutation.getAllStates())}`);
 
     try {
         permutation = applyFacingDirection(player, permutation, id, dir);
         permutation = applyCardinalDirection(player, permutation, dir);
         permutation = applyWeirdoDirection(player, permutation, dir);
     } catch (e) {
-        debug(player, `向き反映に失敗: ${e}`);
+        debug(player, `Failed to apply facing: ${e}`);
     }
 
-    debug(player, () => `最終ステート: ${JSON.stringify(permutation.getAllStates())}`);
+    debug(player, () => `Final states: ${JSON.stringify(permutation.getAllStates())}`);
     return permutation;
 }
 
@@ -229,7 +229,7 @@ function findPlaceTarget(player) {
     // カーソルの先にブロックがある場合は通常の設置を行う
     const hit = player.getBlockFromViewDirection({ maxDistance: config.normalReach });
     if (hit) {
-        debug(player, "中断: 視線の先にブロックがあるため通常設置を行う");
+        debug(player, "Aborted: a block is in the line of sight, leaving it to normal placement");
         return undefined;
     }
 
@@ -245,19 +245,19 @@ function findPlaceTarget(player) {
     // 設置予定座標のブロックを確認
     const block = player.dimension.getBlock(target);
     if (!block) {
-        debug(player, "中断: 設置先のブロックを取得できません(未ロードチャンクの可能性)");
+        debug(player, "Aborted: could not get the target block (chunk may not be loaded)");
         return undefined;
     }
 
     // 設置予定座標のブロックが空気か液体の場所にだけブロックを設置する
     if (!block.isAir && !block.isLiquid) {
-        debug(player, `中断: 設置先が置換不可 (${block.typeId})`);
+        debug(player, `Aborted: target is not replaceable (${block.typeId})`);
         return undefined;
     }
 
     // 自分の足元・頭の位置には設置しない
     if (isInsideBlock(player.location, target) || isInsideBlock(head, target)) {
-        debug(player, "中断: 設置先がプレイヤー自身の位置と重なる");
+        debug(player, "Aborted: target overlaps the player's own position");
         return undefined;
     }
 
@@ -283,7 +283,7 @@ function isHoldContinuing(player) {
     }
 
     const gap = now - lastTick;
-    debug(player, `前回の操作から ${gap}tick`);
+    debug(player, `Ticks since last activity: ${gap}`);
     return gap <= config.holdReleaseTicks;
 }
 
@@ -313,7 +313,7 @@ function protectPlacedBlock(player, target) {
 // 空中設置を試みる
 function tryAirPlace(player, item) {
     debug(player, "----------------------------------------");
-    debug(player, `空中設置を試行: item=${item.typeId}`);
+    debug(player, `Trying air placement: item=${item.typeId}`);
 
     // ブロックの設置が可能かを判別
     if (!isPlaceableBlock(player, item)) {
@@ -334,8 +334,8 @@ function tryAirPlace(player, item) {
     protectPlacedBlock(player, place.target);
 
     const { target } = place;
-    debug(player, () => `設置後の実ステート: ${JSON.stringify(place.block.permutation.getAllStates())}`);
-    debug(player, `設置成功: ${item.typeId} -> (${target.x}, ${target.y}, ${target.z})`);
+    debug(player, () => `States after placement: ${JSON.stringify(place.block.permutation.getAllStates())}`);
+    debug(player, `Placed: ${item.typeId} -> (${target.x}, ${target.y}, ${target.z})`);
 }
 
 // ===== イベント処理 =====
@@ -344,18 +344,18 @@ function tryAirPlace(player, item) {
 // PCは右クリック、スマホは長押しで発火する
 export function onItemUse(event) {
     const player = event.source;
-    debug(player, () => `itemUse発火: tick=${system.currentTick}`);
+    debug(player, () => `itemUse fired: tick=${system.currentTick}`);
 
     // 無効時は何もしない
     if (!isEnabledPlacement()) {
-        debug(player, "中断: 空中設置無効状態");
+        debug(player, "Aborted: air placement is disabled");
         return;
     }
 
     // スマホでは、長押しが続いている間は設置しない
     // (指で触れた位置がわからないため、ブロックを壊した後も続く長押しで、設置が走るのを防ぐ)
     if (isTouchInput(player) && isHoldContinuing(player)) {
-        debug(player, "中断: 長押し継続中のため設置しない");
+        debug(player, "Aborted: long press still in progress, not placing");
         return;
     }
 
@@ -374,7 +374,7 @@ export function onEntityHitBlock(event) {
     }
 
     recordActivity(player);
-    debug(player, () => `ブロックを叩いた: tick=${system.currentTick}`);
+    debug(player, () => `Block hit: tick=${system.currentTick}`);
 }
 
 // ブロック破壊イベント発火時処理
@@ -403,6 +403,6 @@ export function onPlayerBreakBlock(event) {
 
     // beforeイベント内ではチャット送信などができないため、デバッグ出力は次のtickに回す
     system.run(() => {
-        debug(player, "破壊をキャンセル: 空中設置直後のブロックは保護中");
+        debug(player, "Break cancelled: block was just placed and is protected");
     });
 }
